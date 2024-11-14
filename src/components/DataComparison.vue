@@ -54,8 +54,16 @@
       </div>
     </div>
 
-    <button class="compare-button" @click="compareData">
-      开启智能比对
+    <button class="compare-button" @click="compareData" :disabled="isComparing">
+      <template v-if="isComparing">
+        <span class="loading-text">
+          <span class="loading-spinner"></span>
+          智能比对中...
+        </span>
+      </template>
+      <template v-else>
+        开启智能比对
+      </template>
     </button>
 
     <div class="diff-section">
@@ -88,7 +96,8 @@ export default {
       formattedSourceData: '',
       formattedTargetData: '',
       diffPaths: new Set(),
-      apiUrl: 'http://localhost:6060/api/compare/data'
+      apiUrl: 'http://localhost:6060/api/compare/data',
+      isComparing: false
     }
   },
 
@@ -247,7 +256,11 @@ export default {
     },
 
     async compareData() {
+      if (this.isComparing) return;
+      
       try {
+        this.isComparing = true;
+        
         const sourceObj = JSON.parse(this.sourceDataText)
         const targetObj = JSON.parse(this.targetDataText)
         
@@ -277,9 +290,8 @@ export default {
         if (result.success) {
           this.diffPaths.clear()
           
-          // 处理差异结果
           Object.entries(result.differences).forEach(([path, diffInfo]) => {
-            console.log('Adding diff path:', path); // 调试日志
+            console.log('Adding diff path:', path);
             this.diffPaths.add(path)
           })
           
@@ -291,6 +303,8 @@ export default {
       } catch (error) {
         console.error('比对错误:', error);
         alert('比对过程出错：' + error.message)
+      } finally {
+        this.isComparing = false;
       }
     },
 
@@ -413,6 +427,18 @@ textarea {
   border-radius: 4px;
   cursor: pointer;
   margin: 20px 0;
+  min-width: 140px;
+  height: 40px;
+  position: relative;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.compare-button:disabled {
+  background-color: #91d5ff;
+  cursor: wait;
 }
 
 .compare-button:hover {
@@ -575,5 +601,28 @@ h3 {
 
 .diff-content::-webkit-scrollbar-thumb:hover {
   background: #999;
+}
+
+.loading-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.loading-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #ffffff;
+  border-top: 2px solid transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 </style> 
