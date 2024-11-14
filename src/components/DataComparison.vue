@@ -189,7 +189,7 @@ export default {
           let displayValue = value;
           
           if (typeof value === 'string') {
-            displayValue = `"${escapeHtml(value)}"`;
+            displayValue = `"${this.escapeHtml(value)}"`;
           } else if (value === null) {
             displayValue = 'null';
           } else {
