@@ -154,40 +154,41 @@ export default {
     },
 
     formatAndHighlight(obj, isSource = true) {
-      const highlight = (key, value, path = '', level = 1) => {
-        const currentPath = path ? `${path}.${key}` : key;
+      const highlight = (value, path = '', level = 1) => {
         const indent = '  '.repeat(level);
         
-        if (typeof value === 'object' && value !== null) {
-          const innerIndent = '  '.repeat(level + 1);
-          let inner;
-          
-          if (Array.isArray(value)) {
-            // 处理数组
-            inner = value.map((item, index) => {
-              if (typeof item === 'object' && item !== null) {
-                // 如果数组元素是对象，递归处理
-                const objEntries = Object.entries(item).map(([k, v]) => {
-                  return innerIndent + '  ' + highlight(k, v, `${currentPath}`, level + 2);
-                }).join(',\n');
-                return `${innerIndent}{\n${objEntries}\n${innerIndent}}`;
+        if (Array.isArray(value)) {
+          // 处理数组
+          const inner = value.map((item, index) => {
+            const arrayPath = path ? `${path}[${index}]` : `[${index}]`;
+            return indent + highlight(item, arrayPath, level + 1);
+          }).join(',\n');
+          return `[\n${inner}\n${indent}]`;
+        } else if (typeof value === 'object' && value !== null) {
+          // 处理对象
+          const inner = Object.entries(value).map(([key, val]) => {
+            const newPath = path ? `${path}.${key}` : key;
+            const isDifferent = this.diffPaths.has(newPath);
+            
+            if (typeof val === 'object' && val !== null) {
+              return `${indent}  "${key}": ${highlight(val, newPath, level + 1)}`;
+            } else {
+              let displayValue = val;
+              if (typeof val === 'string') {
+                displayValue = `"${this.escapeHtml(val)}"`;
+              } else if (val === null) {
+                displayValue = 'null';
               } else {
-                return innerIndent + JSON.stringify(item);
+                displayValue = String(val);
               }
-            }).join(',\n');
-            return `"${key}": [\n${inner}\n${indent}]`;
-          } else {
-            // 处理对象
-            inner = Object.entries(value).map(([k, v]) => {
-              return innerIndent + highlight(k, v, currentPath, level + 1);
-            }).join(',\n');
-            return `"${key}": {\n${inner}\n${indent}}`;
-          }
+              return `${indent}  "${key}": <span class="${isDifferent ? 'diff-highlight' : ''}">${displayValue}</span>`;
+            }
+          }).join(',\n');
+          return `{\n${inner}\n${indent}}`;
         } else {
-          // 处理基本类型值
-          const isDifferent = this.diffPaths.has(currentPath);
+          // 处理基本类型
+          const isDifferent = this.diffPaths.has(path);
           let displayValue = value;
-          
           if (typeof value === 'string') {
             displayValue = `"${this.escapeHtml(value)}"`;
           } else if (value === null) {
@@ -195,18 +196,12 @@ export default {
           } else {
             displayValue = String(value);
           }
-          
-          const className = isDifferent ? 'diff-highlight' : '';
-          return `"${key}": <span class="${className}">${displayValue}</span>`;
+          return `<span class="${isDifferent ? 'diff-highlight' : ''}">${displayValue}</span>`;
         }
       };
 
       try {
-        const formatted = Object.entries(obj).map(([key, value]) => {
-          return '  ' + highlight(key, value);
-        }).join(',\n');
-        
-        return `{\n${formatted}\n}`;
+        return highlight(obj);
       } catch (error) {
         console.error('格式化错误:', error);
         return '';
@@ -257,10 +252,9 @@ export default {
         const targetObj = JSON.parse(this.targetDataText)
         
         const mappings = this.sourceFields.split('\n')
-          .filter(field => field.trim())
-          .map((sourcePath, index) => ({
-            sourcePath: sourcePath.trim(),
-            targetPath: this.targetFields.split('\n')[index].trim()
+          .map((field, index) => ({
+            sourcePath: field.trim(),
+            targetPath: this.targetFields.split('\n')[index]?.trim()
           }))
           .filter(mapping => mapping.sourcePath && mapping.targetPath)
 
@@ -283,17 +277,19 @@ export default {
         if (result.success) {
           this.diffPaths.clear()
           
-          Object.keys(result.differences).forEach(path => {
+          // 处理差异结果
+          Object.entries(result.differences).forEach(([path, diffInfo]) => {
+            console.log('Adding diff path:', path); // 调试日志
             this.diffPaths.add(path)
           })
           
-          this.formattedSourceData = this.formatAndHighlight(sourceObj[0], true)
-          this.formattedTargetData = this.formatAndHighlight(targetObj[0], false)
+          this.formattedSourceData = this.formatAndHighlight(sourceObj)
+          this.formattedTargetData = this.formatAndHighlight(targetObj)
         } else {
           alert('比对失败：' + result.message)
         }
-        
       } catch (error) {
+        console.error('比对错误:', error);
         alert('比对过程出错：' + error.message)
       }
     },
@@ -540,7 +536,7 @@ h3 {
   color: #f44336;
   padding: 2px 4px;
   border-radius: 2px;
-  display: inline-block;  /* 确保高亮背景完整显示 */
+  display: inline-block;
 }
 
 /* JSON 键值对样式 */
